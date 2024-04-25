@@ -1,0 +1,12 @@
+This is a support ticket about "{{ jira.title }}".
+
+{% if jira.kind == BUGFIX %} It's a bug fix. {% endif %}
+{% if jira.kind == FEATURE %} It's a new feature. {% endif %}
+
+It is marked as fixed in version {{ jira.fix_version }}
+
+{% jira.text %}
+
+{% for comment in jira.comments %}
+{{ jira.author }} commented: {{ comment.text }}
+{% endfor %}
