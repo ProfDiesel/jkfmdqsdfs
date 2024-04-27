@@ -1,0 +1,3 @@
+{% for message in chat.messages %}
+At {{ message.timestamp }}, {{ message.author }} said "{{ message.message }}"
+{% endfor %}

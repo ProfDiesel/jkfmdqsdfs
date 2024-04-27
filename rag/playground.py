@@ -6,6 +6,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.language_models import SimpleChatModel 
 from langchain_core.messages import BaseMessage, merge_content
 from langchain_core.messages.ai import AIMessage
+from langchain_core.messages.human import HumanMessage
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.outputs import ChatGeneration, ChatResult
 
@@ -21,9 +22,10 @@ class PlaygroundChatModel(SimpleChatModel):
         run_manager: Optional[CallbackManagerForLLMRun] = None,
         **kwargs: Any,
     ) -> str:
-        merged = BaseMessage(reduce(merge_content, (message.content for message in messages)))
+        merged = HumanMessage(content=reduce(merge_content, (message.content for message in messages)))
         request: str = StrOutputParser().invoke(merged)
-        return await lab_magic(request)
+        #return await lab_magic(request)
+        return ''
 
     @property
     def _llm_type(self) -> str:
