@@ -3,7 +3,7 @@ from dataclasses import dataclass
 import asyncio
 from .prompt import prompts 
 from .compose import sync, Pipe, parallel 
-from .endpoint import Endpoint, LLM
+from .endpoint import Endpoint, LLM, QueryEmbedder
 from typing import Callable, Iterable, TypedDict, Any
 from functools import partial
 from .issue import IssueFeatures
@@ -13,12 +13,7 @@ class IssueDetectorInput(TypedDict):
 
 class IssueFeatureExtractionInput(TypedDict):
     chat_history: str
-    
-@dataclass(frozen=True, kw_only=True)
-class Document:
-    text: str
-    metadata: dict[str, Any]
-    score: float
+
     
 def issue_detection_chain(llm: LLM) -> Pipe[[str], bool]:
     s: Callable[[str], IssueDetectorInput] = lambda s: {'chat_history': s} 
@@ -36,7 +31,7 @@ def issue_feature_extraction_chain(llm: LLM) -> Pipe[[str], IssueFeatures]:
           | sync(IssueFeatures.model_validate_json)
           )
 
-def doc_retrieval_chain(embedder: QueryEmbedder) -> Pipe[[str], list[Document]]:
+def doc_retrieval_chain(embedder: QueryEmbedder) -> Pipe[[str], list[tuple[Document, Score]]]:
     def consolidate():
         pass
 
@@ -65,16 +60,3 @@ def doc_retrieval_chain(embedder: QueryEmbedder) -> Pipe[[str], list[Document]]:
     )
 
 
-async def _main():
-    endpoint = Endpoint()
-    c = issue_detection_chain(partial(endpoint.llm, model_name='pipo'))
-
-    #await ("pipo" > c)
-
-    
-
-    c = issue_detection_chain(partial(mock_llm(('YES', 'NO')), model_name='pipo'))
-    await ("pipo" > c)
-
-def main():
-    asyncio.run(_main())
