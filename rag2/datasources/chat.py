@@ -1,10 +1,18 @@
 from datetime import date, datetime
 from pathlib import Path
-from typing import Final, List, Literal, Tuple
+from typing import Final, cast, TypeVar
+from collections.abc import Sequence
 
-from pydantic.dataclasses import dataclass
-from pydantic import TypeAdapter
+import orjson
 from jinja2 import Template
+from pydantic import TypeAdapter
+from pydantic.dataclasses import dataclass
+
+from .vectorstore import Score, Vector, VectorStore
+from ..endpoint import QueryEmbedder
+
+T = TypeVar('T')
+
 
 @dataclass(frozen=True, kw_only=True)
 class Message:
@@ -15,39 +23,16 @@ class Message:
 @dataclass(frozen=True, kw_only=True)
 class Chat:
     date: date
-    messages: List[Message] 
+    messages: list[Message] 
 
 CHAT_ADAPTER: Final[TypeAdapter] = TypeAdapter(Chat)
 
-async def _search(store: VectorStore[Chat], query_vector: Vector, query: str, *, k: int = 4) -> list[tuple[Chat, Score]]:
-    ...
-
+FIRST_PASS_K = 25
 DECAY_RATE = 0.9
 DIVERSITY_FACTOR = 0.5
 
-
-async def search(store: VectorStore[Chat], embedder: QueryEmbedder, query: str, *, k: int = 4, today: date | None = None) -> list[tuple[Chat, Score]]:
-    if today is None:
-        today = date.today()
-    
-    query_vector = await embedder(query)
-
-    results = _search(store, query_vector, k = 100)
-    results = maximal_marginal_relevance(query_vector, results, embedding_matrix, 1 - DIVERSITY_FACTOR)
-    results = [(chat, score * (1.0 - DECAY_RATE) ^ (today - chat.date).days) for chat, score in results]
-    return results
-
-
-def maximal_marginal_relevance(sentence_vector, phrases, embedding_matrix, lambda_constant=0.5):
-    """
-    Return ranked phrases using MMR. Cosine similarity is used as similarity measure.
-    :param sentence_vector: Query vector
-    :param phrases: list of candidate phrases
-    :param embedding_matrix: matrix having index as phrases and values as vector
-    :param lambda_constant: 0.5 to balance diversity and accuracy. if lambda_constant is high, then higher accuracy. If lambda_constant is low then high diversity.
-    :return: Ranked phrases with score
-    """
-
+# https://medium.com/tech-that-works/maximal-marginal-relevance-to-rerank-results-in-unsupervised-keyphrase-extraction-22d95015c7c5
+def maximal_marginal_relevance(sentence_vector: Vector, phrases: Sequence[tuple[float, T]], embedding_matrix: Sequence[Vector], lambda_constant=0.5) -> list[tuple[int, float]]:
     def cosine_similarity(a: Vector, b: Vector) -> float:
         from math import sqrt
         dot_product = sum(xa * xb for xa, xb in zip(a, b))
@@ -55,28 +40,33 @@ def maximal_marginal_relevance(sentence_vector, phrases, embedding_matrix, lambd
         magnitude_B = sqrt(sum(x * x for x in b))
         return dot_product / (magnitude_A * magnitude_B)
 
-    # todo: Use cosine similarity matrix for lookup among phrases instead of making call everytime.
-    s = []
-    r = sorted(phrases, key=lambda x: x[1], reverse=True)
-    r = [i[0] for i in r]
+    s: list[tuple[int, float]] = []
+    r: list[int] = [i[0] for i in sorted(enumerate(phrases), key=lambda x: x[1], reverse=True)]
     while len(r) > 0:
-        score = 0
-        phrase_to_add = ''
-        for i in r:
-            # accuracy
-            first_part = cosine_similarity([sentence_vector], [embedding_matrix.loc[i]])[0][0]
-            # diversity
-            second_part = 0
-            for j in s:
-                cos_sim = cosine_similarity([embedding_matrix.loc[i]], [embedding_matrix.loc[j[0]]])[0][0]
-                if cos_sim > second_part:
-                    second_part = cos_sim
-            equation_score = lambda_constant*(first_part)-(1-lambda_constant) * second_part
-            if equation_score > score:
-                score = equation_score
-                phrase_to_add = i
-        if phrase_to_add == '':
-            phrase_to_add = i
-        r.remove(phrase_to_add)
-        s.append((phrase_to_add, score))
+        def compute_score(i: int) -> float:
+            accuracy = cosine_similarity(sentence_vector, embedding_matrix[i])
+            diversity = max(cosine_similarity(embedding_matrix[i], embedding_matrix[j]) for j,_ in s)
+            return lambda_constant*(accuracy)-(1-lambda_constant) * diversity 
+        score, to_add = max((compute_score(i), i) for i in r)
+        r.remove(to_add)
+        s.append((to_add, score))
     return s
+
+
+async def search(store: VectorStore[Chat], embedder: QueryEmbedder, query: str, *, today: date | None = None, k: int = 4) -> list[tuple[Chat, Score]]:
+    if today is None:
+        today = date.today()
+    
+    query_vector = await embedder(query)
+
+    results: list[tuple[Chat, Vector, Score]] = [(CHAT_ADAPTER.validate_json(payload), orjson.loads(embedding), cast(Score, distance)) for payload, embedding, distance in store.connection.execute( f"""
+        SELECT payload, embedding, distance
+        FROM {store.table} e
+        INNER JOIN vss_{store.table} v on v.rowid = e.rowid  
+        WHERE vss_search(v.embedding, vss_search_params('{orjson.dumps(query_vector).decode()}', {FIRST_PASS_K}))
+    """)]
+    results = maximal_marginal_relevance(query_vector, results, embedding_matrix, 1 - DIVERSITY_FACTOR)
+    results = [(chat, score * (1.0 - DECAY_RATE) ^ (today - chat.date).days) for chat, score in results]
+    return results
+
+

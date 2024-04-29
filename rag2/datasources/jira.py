@@ -1,4 +1,4 @@
-from typing import Literal, Final
+from typing import Literal, Final, cast
 
 import orjson
 from pydantic.dataclasses import dataclass
@@ -25,7 +25,7 @@ JIRA_ADAPTER: Final[TypeAdapter] = TypeAdapter(Jira)
 
 
 async def search(store: VectorStore[Jira], embedder: QueryEmbedder, query: str, *, version: str, k: int = 4) -> list[tuple[Jira, Score]]:
-    return [(JIRA_ADAPTER.validate_json(payload), distance) for payload, distance in store.connection.execute( f"""
+    return [(JIRA_ADAPTER.validate_json(payload), cast(Score, distance)) for payload, distance in store.connection.execute( f"""
         SELECT payload, distance
         FROM (
             SELECT * FROM {store.table} e

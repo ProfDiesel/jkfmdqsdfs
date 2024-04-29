@@ -1,6 +1,6 @@
 from collections.abc import Iterable, Sequence
 from pathlib import Path
-from typing import (Any, Final, Generic, Literal, NewType, Protocol, TypeVar,
+from typing import (Final, Generic, Literal, NewType, Protocol, TypeVar,
                     cast)
 
 import apsw

@@ -10,10 +10,6 @@ from .issue import IssueFeatures
 
 class IssueDetectorInput(TypedDict):
     chat_history: str
-
-class IssueFeatureExtractionInput(TypedDict):
-    chat_history: str
-
     
 def issue_detection_chain(llm: LLM) -> Pipe[[str], bool]:
     s: Callable[[str], IssueDetectorInput] = lambda s: {'chat_history': s} 
@@ -22,6 +18,9 @@ def issue_detection_chain(llm: LLM) -> Pipe[[str], bool]:
           | llm
           | sync(lambda x: x == 'YES')
           )
+
+class IssueFeatureExtractionInput(TypedDict):
+    chat_history: str
 
 def issue_feature_extraction_chain(llm: LLM) -> Pipe[[str], IssueFeatures]:
     s: Callable[[str], IssueFeatureExtractionInput] = lambda s: {'chat_history': s} 
@@ -34,18 +33,6 @@ def issue_feature_extraction_chain(llm: LLM) -> Pipe[[str], IssueFeatures]:
 def doc_retrieval_chain(embedder: QueryEmbedder) -> Pipe[[str], list[tuple[Document, Score]]]:
     def consolidate():
         pass
-
-    def litm_reorder(documents: list[T]) -> list[T]:
-        """https://arxiv.org/abs//2307.03172"""
-
-        documents.reverse()
-        reordered_result: list[T] = []
-        for i, value in enumerate(documents):
-            if i % 2 == 1:
-                reordered_result.append(value)
-            else:
-                reordered_result.insert(0, value)
-        return reordered_result
 
     return (Pipe()
         | parallel(
