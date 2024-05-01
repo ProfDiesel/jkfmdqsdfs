@@ -47,3 +47,4 @@ def doc_retrieval_chain(embedder: QueryEmbedder) -> Pipe[[str], list[tuple[Docum
     )
 
 
+
