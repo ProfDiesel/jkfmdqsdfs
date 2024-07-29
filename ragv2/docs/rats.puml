@@ -1,0 +1,21 @@
+chat bot
+-> new_message_event
+
+- generate tracker_id
+- thread detection
+
+- for each "rat": parallel map/reduce
+    "chat" rat
+    "wiki" rat
+    "jira" rat
+    "app config" rat
+
+    kb rats (share kb search result in ShotVar):
+    "question" rat
+    "grep logs" rat
+    "action" rat
+
+- stuff the rest of the context with data from glossary
+
+- generate RAG response
+- compute KPIs

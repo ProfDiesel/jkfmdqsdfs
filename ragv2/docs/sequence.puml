@@ -1,0 +1,43 @@
+@startuml
+!pragma teoz true
+
+actor "Chat bot" as bot
+participant "Threads\ndetector" as threads
+participant "Problem\ndetector" as problem #IndianRed
+participant "Problem\nqualifier" as qualifier #IndianRed
+participant "Problem\ncontextualizer" as sumarizer #IndianRed
+participant "Retriever" as retriever
+database "Elastic\nchats" as chats_db #IndianRed
+database "Elastic\njiras" as jiras_db #LightBlue
+database "Elastic\nconfuence" as wikis_db #LightBlue
+database "SQlite\nglossary" as glossary_db #LightGreen
+database "SQlite\nknowledge base" as knowledge_base_db #LightGreen
+participant "Text" as bullshit #IndianRed
+actor "UI" as gui
+
+bot -> threads: new message
+threads -> problem: pipo
+alt problem detected
+  problem -> qualifier
+  alt can qualify
+    retriever -> chats_db
+    &retriever -> jiras_db
+    &retriever -> wikis_db
+    &retriever -> glossary_db
+    &retriever -> knowledge_base_db
+
+    retriever <- chats_db
+    &retriever <- jiras_db
+    &retriever <- wikis_db
+    &retriever <- glossary_db
+    &retriever <- knowledge_base_db
+
+    retriever -> bullshit: documents
+    bullshit -> gui
+  else can't qualify
+    qualifier -> gui: question
+  end
+else no problem
+end
+
+@enduml
