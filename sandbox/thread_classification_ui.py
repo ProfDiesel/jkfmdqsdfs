@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-from datetime import date, timedelta, datetime
-from uuid import uuid4
+from datetime import date, datetime
 from dataclasses import dataclass
 
 from nicegui import ui
@@ -25,6 +24,9 @@ class Room:
     def __hash__(self) -> int:
         return hash(self.name)
 
+    def thread(self, n: int) -> Thread:
+        return sorted(self.threads.items())[n][1]
+
 
 ROOMS = [
     Room("room 0", {
@@ -48,52 +50,58 @@ ROOMS = [
     }),
 ]
 
+THREAD_COLORS = ['#ff9999', '#ffcc99', '#ffff99', '#99ff99', '#99ffcc', '#99ffcc', '#99ccff', '#9999ff', '#cc99ff', '#ff99ff']
 
 @ui.refreshable
-def chat_messages(thread: Thread) -> None:
-    for n, message in enumerate(thread.messages):
-        def move():
-            thread.labels[n] = (thread.labels[n] + 1) % thread.nb_thread
-            chat_messages.refresh()
-        with ui.chat_message(text=message.text, stamp=message.stamp.isoformat(), avatar=message.avatar):
-            ui.button(icon='alt_route', on_click=move)
+def chat_message(thread: Thread, n: int) -> None:
+    message: Message = thread.messages[n]
+    def move(n=n):
+        thread.labels[n] = (thread.labels[n] + 1) % thread.nb_thread
+        chat_message.refresh()
+    color = THREAD_COLORS[thread.labels[n]]
+    with ui.item(on_click=move):
+        with ui.item_section() as s:
+            s.style(f'background-color: {color}')
+            ui.item_label(message.stamp.isoformat())
+        with ui.item_section():
+            ui.item_label(message.text)
 
-
-@ui.refreshable
-def fancy_date_selector(dates: list[date]):
-    date_index, select_date_index = ui.state(len(dates) - 1)
-    dates_as_str = [date.isoformat() for date in dates]
-    with ui.input(label='date', value=dates_as_str[date_index], autocomplete=dates_as_str, validation={'invalid date': lambda value: value in dates_as_str}) as date_input:
-        with ui.menu().props('no-parent-event') as menu:
-            with ui.date(on_change=lambda event: select_date_index(dates_as_str.index(event.value))) \
-                .props(f''':options="date => ['{"', '".join(date.isoformat() for date in dates)}'].indexOf(new Date(date).toISOString().substring(0, 10)) != -1"''') \
-                .bind_value(date_input):
-                with ui.row().classes('justify-end'):
-                    ui.button('Close', on_click=menu.close).props('flat')
-        with date_input.add_slot('append'):
-            if date_index == 0:
-                ui.icon('block')
-            else:
-                ui.icon('chevron_left').on('click', lambda: select_date_index(date_index - 1)).classes('cursor-pointer')
-            ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
-            if date_index == len(dates) - 1:
-                ui.icon('block')
-            else:
-                ui.icon('chevron_right').on('click', lambda: select_date_index(date_index + 1)).classes('cursor-pointer')
-    return date_input
-
+    
 @ui.refreshable
 async def label_editor(rooms: list[Room]) -> None:
-    room, select_room = ui.state(rooms[0])
-    all_dates: list[date] = sorted(room.threads.keys())
-    current_date: date = all_dates[0]
+    room, set_room_ = ui.state(rooms[0])
+    date_index, set_date_index = ui.state(len(room.threads) - 1)
 
-    ui.select({room: room.name for room in rooms}, with_input=True, on_change=lambda event: select_room(event.value))
-    date_select = fancy_date_selector(all_dates)
-    date_select.bind_value_to(locals(), 'current_date', forward=date.fromisoformat)
+    def set_room(room: Room):
+        set_room_(room)
+        set_date_index(len(room.threads) - 1)
+
+    with ui.row():
+        ui.select({room: room.name for room in rooms}, value=room, label="room", with_input=True, on_change=lambda event: set_room(event.value))
+
+        dates_as_str = [date.isoformat() for date in sorted(room.threads.keys())]
+        with ui.input(label='date', value=dates_as_str[date_index], autocomplete=dates_as_str, validation={'invalid date': lambda value: value in dates_as_str}) as date_input:
+            with ui.menu().props('no-parent-event') as menu:
+                with ui.date(on_change=lambda event: set_date_index(dates_as_str.index(event.value))) \
+                    .props(f''':options="date => ['{"', '".join(dates_as_str)}'].indexOf(new Date(date).toISOString().substring(0, 10)) != -1"'''):
+                    with ui.row().classes('justify-end'):
+                        ui.button('Close', on_click=menu.close).props('flat')
+            with date_input.add_slot('append'):
+                if date_index == 0:
+                    ui.icon('block')
+                else:
+                    ui.icon('chevron_left').on('click', lambda: set_date_index(date_index - 1)).classes('cursor-pointer')
+                ui.icon('edit_calendar').on('click', menu.open).classes('cursor-pointer')
+                if date_index == len(dates_as_str) - 1:
+                    ui.icon('block')
+                else:
+                    ui.icon('chevron_right').on('click', lambda: set_date_index(date_index + 1)).classes('cursor-pointer')
 
     with ui.column():
-        chat_messages(room.threads[current_date])
+        with ui.list().props('bordered separator'):
+            for n in range(len(room.thread(date_index).messages)):
+                chat_message(room.thread(date_index), n)
+
 
 @ui.page('/')
 async def main() -> None:
@@ -101,5 +109,13 @@ async def main() -> None:
 
 
 if __name__ in {'__main__', '__mp_main__'}:
+    ui.colors(primary='#007348',
+              secondary='#8bc8aa',
+              accent='#99cc00',
+              dark='#000000',
+              dark_page='#121212',
+              positive='#00a300',
+              negative='#a30000',
+              info='#00005c',
+              warning='#a35200')
     ui.run(show=False)
-

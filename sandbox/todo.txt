@@ -1,0 +1,15 @@
+
+RAG:
+===
+Contextual Retrieval: https://www.metadocs.co/2024/10/25/contextual-retrieval-a-powerful-rag-technique-that-your-wallet-will-like/
+<document> 
+{{WHOLE_DOCUMENT}} 
+</document> 
+Here is the chunk we want to situate within the whole document 
+<chunk> 
+{{CHUNK_CONTENT}} 
+</chunk> 
+Please give a short succinct context to situate this chunk within the overall document for the purposes of improving search retrieval of the chunk. Answer only with the succinct context and nothing else.
+
+
+Simple domain specific Corrective RAG: https://www.metadocs.co/2024/08/29/simple-domain-specific-corrective-rag-with-langchain-and-langgraph/

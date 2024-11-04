@@ -72,10 +72,9 @@ class CompositeDistanceFeature:
         for similarity in X:
             composite = (1 + self.semantic_weight * similarity.semantic) * (1 + self.lexical_weight * similarity.lexical) \
                       * (1 + self.time_weight * similarity.time) * (1 + self.social_weight * similarity.social)
-            for i in len(composite):
-                for j in len(composite):
-                    similarity.perplexity
-        return cols
+            composite += similarity.perplexity.values * self.perplexity_weight \
+                       - similarity.perplexity.presence * (1 - self.perplexity_weight)
+        return composite
 
     def fit(self, X, y=None):
         return self
