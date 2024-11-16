@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import asyncio
 from datetime import date, datetime
 from dataclasses import dataclass
 
@@ -55,11 +56,11 @@ THREAD_COLORS = ['#ff9999', '#ffcc99', '#ffff99', '#99ff99', '#99ffcc', '#99ffcc
 @ui.refreshable
 def chat_message(thread: Thread, n: int) -> None:
     message: Message = thread.messages[n]
-    def move(n=n):
+    def move_to_next_thread(n=n):
         thread.labels[n] = (thread.labels[n] + 1) % thread.nb_thread
         chat_message.refresh()
     color = THREAD_COLORS[thread.labels[n]]
-    with ui.item(on_click=move):
+    with ui.item(on_click=move_to_next_thread):
         with ui.item_section() as s:
             s.style(f'background-color: {color}')
             ui.item_label(message.stamp.isoformat())
@@ -68,13 +69,13 @@ def chat_message(thread: Thread, n: int) -> None:
 
     
 @ui.refreshable
-async def label_editor(rooms: list[Room]) -> None:
-    room, set_room_ = ui.state(rooms[0])
+def label_editor(rooms: list[Room]) -> None:
+    room, set_room = ui.state(rooms[0])
     date_index, set_date_index = ui.state(len(room.threads) - 1)
 
-    def set_room(room: Room):
-        set_room_(room)
+    if date_index >= len(room.threads):
         set_date_index(len(room.threads) - 1)
+        return
 
     with ui.row():
         ui.select({room: room.name for room in rooms}, value=room, label="room", with_input=True, on_change=lambda event: set_room(event.value))
@@ -102,11 +103,14 @@ async def label_editor(rooms: list[Room]) -> None:
             for n in range(len(room.thread(date_index).messages)):
                 chat_message(room.thread(date_index), n)
 
+async def save():
+    await asyncio.sleep(3)
+    print("saved")
 
 @ui.page('/')
 async def main() -> None:
-    await label_editor(ROOMS)
-
+    label_editor(ROOMS)
+    ui.button(icon="save", on_click=save)
 
 if __name__ in {'__main__', '__mp_main__'}:
     ui.colors(primary='#007348',
