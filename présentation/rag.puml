@@ -1,0 +1,10 @@
+@startuml RAG
+
+User -> Assistant: query
+Assistant -> DB:  query
+DB -> Assistant: records
+Assistant -> LLM: prompt + query + records
+LLM -> Assistant: response
+Assistant -> User: response
+
+@enduml

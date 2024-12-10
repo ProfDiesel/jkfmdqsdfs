@@ -1,0 +1,8 @@
+@startuml RAG
+
+User -> Assistant: question
+Assistant -> LLM: prompt + question
+LLM -> Assistant: response
+Assistant -> User: response
+
+@enduml
